@@ -1,16 +1,53 @@
-# This is a sample Python script.
+from fastapi import FastAPI
+import uvicorn
+from typing import Optional
+from pydantic import BaseModel
+import secrets
 
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
+class Item(BaseModel):
+    name: str
+    description: Optional[str] = None
+    price: int
+    tax: Optional[float] = None
 
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+app = FastAPI()
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+security = HTTPBasic()
+
+
+def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = secrets.compare_digest(credentials.username, "test")
+    correct_password = secrets.compare_digest(credentials.password, "test")
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+
+@app.get("/")
+def read_root(credentials: HTTPBasicCredentials = Depends(get_current_username)):
+    return {"Hi": "from API Server)"}
+
+
+@app.get("/test/{item_id}")
+async def read_item(item_id: int, credentials: HTTPBasicCredentials = Depends(get_current_username)):
+    print(item_id)
+    return {"item_id": item_id}
+
+
+@app.get("/check")
+def hello():
+    return "Hello World"
+
+
+@app.post("/items/")
+async def create_item(item: Item, credentials: HTTPBasicCredentials = Depends(get_current_username)):
+    return item
